@@ -7,6 +7,9 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import Optional
 from dotenv import load_dotenv
+from fastapi.responses import Response
+from fastapi import Request
+
 
 from retriever import retrieve
 
@@ -407,3 +410,14 @@ async def root():
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+@app.options("/chat")
+async def options_chat(request: Request):
+    return Response(
+        status_code=200,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
+        }
+    )
