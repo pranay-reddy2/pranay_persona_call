@@ -108,7 +108,7 @@ async def vapi_chat(req: VapiRequest):
                 "X-Title": "Pranay AI Agent"
             },
             json={
-                "model": MODEL,
+                "model":  "openrouter/auto",
                 "messages": messages,
                 "temperature": 0.3,
                 "max_tokens": 150
