@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
+from typing import Optional
 from dotenv import load_dotenv
 
 from retriever import retrieve
@@ -33,6 +34,7 @@ RULES:
 - Keep answers short and conversational.
 - Maximum 2-3 sentences.
 - Stay focused on Pranay's background, projects, experience and qualifications.
+- If the user wants to book a meeting, use the available booking tool — do NOT just give an email address.
 
 Retrieved Context:
 {context}
@@ -67,6 +69,8 @@ class VapiRequest(BaseModel):
     model: str = ""
     temperature: float = 0.3
     max_tokens: int = 200
+    tools: Optional[list] = None          # ✅ Accept tools from VAPI
+    tool_choice: Optional[str] = None     # ✅ Accept tool_choice from VAPI
 
 
 # =====================================================
@@ -113,31 +117,21 @@ async def chat(req: ChatRequest):
         )
 
         data = response.json()
-
-        print("CHAT RESPONSE:")
-        print(data)
+        print("CHAT RESPONSE:", data)
 
         if "choices" not in data:
-            return {
-                "reply": f"API Error: {data}"
-            }
+            return {"reply": f"API Error: {data}"}
 
         reply = data["choices"][0]["message"]["content"]
-
-        return {
-            "reply": reply
-        }
+        return {"reply": reply}
 
     except Exception as e:
         print("CHAT ERROR:", str(e))
-
-        return {
-            "reply": "Something went wrong."
-        }
+        return {"reply": "Something went wrong."}
 
 
 # =====================================================
-# VAPI ENDPOINT — SSE Streaming
+# VAPI ENDPOINT — SSE Streaming + Tool Forwarding
 # =====================================================
 
 @app.post("/chat/completions")
@@ -161,7 +155,6 @@ async def vapi_chat(req: VapiRequest):
 
             if isinstance(content, str):
                 user_message = content
-
             elif isinstance(content, list):
                 user_message = " ".join(
                     item.get("text", "")
@@ -175,8 +168,7 @@ async def vapi_chat(req: VapiRequest):
 
         # ── Build history (exclude last user message) ──
         history = [
-            m
-            for m in req.messages
+            m for m in req.messages
             if m.get("role") in ["user", "assistant"]
         ][:-1]
 
@@ -190,17 +182,26 @@ async def vapi_chat(req: VapiRequest):
                 "content": SYSTEM_PROMPT.format(context=context)
             }
         ]
-
         messages.extend(history)
+        messages.append({"role": "user", "content": user_message})
 
-        messages.append(
-            {
-                "role": "user",
-                "content": user_message
-            }
-        )
+        # ── Build OpenRouter payload ──
+        openrouter_payload = {
+            "model": MODEL,
+            "messages": messages,
+            "temperature": 0.3,
+            "max_tokens": 200
+        }
 
-        # ── Call OpenRouter (non-streaming) ──
+        # ✅ Forward tools from VAPI to OpenRouter if present
+        if req.tools:
+            openrouter_payload["tools"] = req.tools
+            print(f"TOOLS FORWARDED: {len(req.tools)} tool(s)")
+
+        if req.tool_choice:
+            openrouter_payload["tool_choice"] = req.tool_choice
+
+        # ── Call OpenRouter ──
         response = requests.post(
             "https://openrouter.ai/api/v1/chat/completions",
             headers={
@@ -209,31 +210,19 @@ async def vapi_chat(req: VapiRequest):
                 "HTTP-Referer": "https://pranay-persona-call.onrender.com",
                 "X-Title": "Pranay AI Agent"
             },
-            json={
-                "model": MODEL,
-                "messages": messages,
-                "temperature": 0.3,
-                "max_tokens": 200
-            },
+            json=openrouter_payload,
             timeout=60
         )
 
         print("OPENROUTER STATUS:", response.status_code)
-
         data = response.json()
-
-        print("OPENROUTER RESPONSE:")
-        print(data)
+        print("OPENROUTER RESPONSE:", data)
 
         if "choices" not in data:
-            # Stream back error in SSE format
             async def error_stream():
                 payload = json.dumps({
                     "choices": [{
-                        "delta": {
-                            "role": "assistant",
-                            "content": "I'm having trouble right now. Please try again."
-                        },
+                        "delta": {"role": "assistant", "content": "I'm having trouble right now. Please try again."},
                         "index": 0,
                         "finish_reason": "stop"
                     }]
@@ -241,68 +230,101 @@ async def vapi_chat(req: VapiRequest):
                 yield f"data: {payload}\n\n"
                 yield "data: [DONE]\n\n"
 
-            return StreamingResponse(
-                error_stream(),
-                media_type="text/event-stream",
-                headers={
-                    "Cache-Control": "no-cache",
-                    "X-Accel-Buffering": "no",
-                }
-            )
+            return StreamingResponse(error_stream(), media_type="text/event-stream",
+                                     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
-        content = data["choices"][0]["message"]["content"]
+        choice = data["choices"][0]
+        finish_reason = choice.get("finish_reason", "stop")
+        message = choice.get("message", {})
 
-        print("\nFINAL RESPONSE TO VAPI:")
-        print(content)
-        print()
+        print(f"FINISH REASON: {finish_reason}")
 
-        # ── Stream back to VAPI in SSE format ──
+        # ── Stream back to VAPI ──
         async def stream_generator():
-            # Main content chunk
-            payload = json.dumps({
-                "id": data.get("id", "chatcmpl-1"),
-                "object": "chat.completion.chunk",
-                "created": data.get("created", 0),
-                "model": MODEL,
-                "choices": [{
-                    "delta": {
-                        "role": "assistant",
-                        "content": content
-                    },
-                    "index": 0,
-                    "finish_reason": None
-                }]
-            })
-            yield f"data: {payload}\n\n"
 
-            # Stop chunk
-            stop_payload = json.dumps({
-                "id": data.get("id", "chatcmpl-1"),
-                "object": "chat.completion.chunk",
-                "created": data.get("created", 0),
-                "model": MODEL,
-                "choices": [{
-                    "delta": {},
-                    "index": 0,
-                    "finish_reason": "stop"
-                }]
-            })
-            yield f"data: {stop_payload}\n\n"
+            # ✅ If LLM wants to call a tool — forward tool_calls to VAPI
+            if finish_reason == "tool_calls" and message.get("tool_calls"):
+                print("TOOL CALLS DETECTED:", message["tool_calls"])
 
-            # SSE done signal
+                for tc in message["tool_calls"]:
+                    tc_payload = json.dumps({
+                        "id": data.get("id", "chatcmpl-1"),
+                        "object": "chat.completion.chunk",
+                        "created": data.get("created", 0),
+                        "model": MODEL,
+                        "choices": [{
+                            "delta": {
+                                "role": "assistant",
+                                "tool_calls": [{
+                                    "index": 0,
+                                    "id": tc.get("id", ""),
+                                    "type": "function",
+                                    "function": {
+                                        "name": tc["function"]["name"],
+                                        "arguments": tc["function"]["arguments"]
+                                    }
+                                }]
+                            },
+                            "index": 0,
+                            "finish_reason": None
+                        }]
+                    })
+                    yield f"data: {tc_payload}\n\n"
+
+                # Send tool_calls finish chunk
+                stop_payload = json.dumps({
+                    "id": data.get("id", "chatcmpl-1"),
+                    "object": "chat.completion.chunk",
+                    "created": data.get("created", 0),
+                    "model": MODEL,
+                    "choices": [{
+                        "delta": {},
+                        "index": 0,
+                        "finish_reason": "tool_calls"
+                    }]
+                })
+                yield f"data: {stop_payload}\n\n"
+
+            else:
+                # ── Normal text response ──
+                content = message.get("content", "")
+                print("\nFINAL RESPONSE TO VAPI:", content)
+
+                payload = json.dumps({
+                    "id": data.get("id", "chatcmpl-1"),
+                    "object": "chat.completion.chunk",
+                    "created": data.get("created", 0),
+                    "model": MODEL,
+                    "choices": [{
+                        "delta": {"role": "assistant", "content": content},
+                        "index": 0,
+                        "finish_reason": None
+                    }]
+                })
+                yield f"data: {payload}\n\n"
+
+                stop_payload = json.dumps({
+                    "id": data.get("id", "chatcmpl-1"),
+                    "object": "chat.completion.chunk",
+                    "created": data.get("created", 0),
+                    "model": MODEL,
+                    "choices": [{
+                        "delta": {},
+                        "index": 0,
+                        "finish_reason": "stop"
+                    }]
+                })
+                yield f"data: {stop_payload}\n\n"
+
             yield "data: [DONE]\n\n"
 
         return StreamingResponse(
             stream_generator(),
             media_type="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache",
-                "X-Accel-Buffering": "no",
-            }
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
         )
 
     except Exception as e:
-
         print("VAPI ERROR:", str(e))
 
         async def exception_stream():
@@ -312,10 +334,7 @@ async def vapi_chat(req: VapiRequest):
                 "created": 0,
                 "model": MODEL,
                 "choices": [{
-                    "delta": {
-                        "role": "assistant",
-                        "content": "I'm having trouble right now. Please try again."
-                    },
+                    "delta": {"role": "assistant", "content": "I'm having trouble right now. Please try again."},
                     "index": 0,
                     "finish_reason": "stop"
                 }]
@@ -326,10 +345,7 @@ async def vapi_chat(req: VapiRequest):
         return StreamingResponse(
             exception_stream(),
             media_type="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache",
-                "X-Accel-Buffering": "no",
-            }
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
         )
 
 
@@ -339,13 +355,9 @@ async def vapi_chat(req: VapiRequest):
 
 @app.get("/")
 async def root():
-    return {
-        "message": "Pranay AI Agent Running"
-    }
+    return {"message": "Pranay AI Agent Running"}
 
 
 @app.get("/health")
 async def health():
-    return {
-        "status": "ok"
-    }
+    return {"status": "ok"}
