@@ -20,7 +20,7 @@ app.add_middleware(
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 MODEL = "meta-llama/llama-3.1-8b-instruct:free"  # free model
 
-SSYSTEM_PROMPT = """You are Pranay Reddy's AI representative.
+SYSTEM_PROMPT = """You are Pranay Reddy's AI representative.
 
 RULES:
 - Answer using ONLY the context below. If the answer is not there, say: "I don't have that detail — Pranay can cover it when you speak with him."
