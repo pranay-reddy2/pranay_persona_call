@@ -130,7 +130,7 @@ def create_cal_booking(name: str, email: str, start_time: str, notes: str = ""):
             },
             json={
                 "start": start_time,
-                "eventTypeSlug": "30min",
+                "eventTypeSlug": "secret",
                 "username": CAL_USERNAME,
                 "attendee": {
                     "name": name,
