@@ -1,0 +1,67 @@
+Pranay Reddy N
+Bengaluru, India | pranayreddy672@gmail.com
+GitHub: github.com/pranay-reddy2
+LinkedIn: linkedin.com/in/pranay-reddy-n-783823326
+
+Full-Stack & AI Engineer · Building production LLM tools as a 2nd-year CS student
+
+EDUCATION
+Scaler School of Technology / BITS Pilani (Online Degree) · 2024 – 2028
+Bachelor of Science in Computer Science
+Note: Scaler School of Technology is the college. Scaler AI Labs is the AI engineering arm of Scaler Academy — a separate team but part of the same parent company. Pranay is applying to Scaler AI Labs.
+
+TECHNICAL SKILLS
+Languages: Java, JavaScript, TypeScript, Python, SQL
+Frontend: React, Next.js, React Native, HTML, CSS
+Backend: Node.js, Express.js, Spring Boot, REST APIs, WebSockets
+Databases: MongoDB, PostgreSQL, MySQL
+AI/ML: LLM integration, RAG pipelines, Supervised Learning fundamentals
+Tools: Git, GitHub, Postman, Vercel, Railway
+
+DATA STRUCTURES & ALGORITHMS
+Strong command over Arrays, Strings, Linked Lists, Stacks, Queues, Trees, Heaps, Tries, HashMaps, and Sets.
+Solved 100+ interview-style problems covering Binary Search, Two Pointers, Sliding Window, and Greedy Algorithms.
+Hands-on experience with Backtracking, Dynamic Programming (memoization and tabulation), and Bit Manipulation.
+Practiced Low-Level Design (LLD): Parking Lot, Snake & Ladder, Pen — applied OOP, SOLID principles, and design patterns in Java.
+
+PROJECTS
+
+NoteBookLLM · Python, JavaScript, LLM APIs
+GitHub: github.com/pranay-reddy2/NoteBookLLM
+GitHub (backend): github.com/pranay-reddy2/NoteBookLLM_Backend
+A full-stack AI note-taking tool that uses RAG (Retrieval-Augmented Generation) to let users query their own documents with natural language. Engineered a Python backend with LLM API integration and a JavaScript frontend, enabling context-aware answers from uploaded content. The backend is in a separate repo showing clean separation of concerns. Actively maintained — updated within the last month.
+
+CLI-Agent · JavaScript, LLM APIs
+GitHub: github.com/pranay-reddy2/CLI-Agent
+An LLM-powered terminal agent that interprets natural language commands and executes shell tasks autonomously. Demonstrates practical understanding of agentic AI patterns, tool-use, and prompt engineering.
+
+GYM_CRM · React, Node.js, Express.js, PostgreSQL
+GitHub: github.com/pranay-reddy2/GYM_CRM
+A production-level full-stack gym management CRM built with commercial intent — designed as a one-time purchase alternative to subscription-based gym software. Features include member management, check-ins, payments, trainer assignments, lead tracking as a Kanban pipeline, churn risk alerts, and an AI-powered message composer. Demonstrates end-to-end product ownership from database schema to UI.
+
+Trading_Bot · Python
+GitHub: github.com/pranay-reddy2/Trading_Bot
+An automated trading bot in Python. Demonstrates ability to apply programming to real financial systems and interest in algorithmic decision-making.
+
+LensPDF · TypeScript
+GitHub: github.com/pranay-reddy2/LensPDF
+A TypeScript-based PDF processing project. Demonstrates range across different languages and problem domains beyond web development.
+
+vocallabs · JavaScript
+GitHub: github.com/pranay-reddy2/vocallabs
+An open-source JavaScript project (MIT license). Demonstrates willingness to share work publicly and contribute to the open-source ecosystem.
+
+Collabify · MERN Stack, WebSockets
+GitHub: github.com/pranay-reddy2/collabify
+A Google Docs-style real-time collaborative editor supporting concurrent multi-user editing using WebSockets for real-time sync. Handled conflict resolution for simultaneous edits. Forked by other developers.
+
+Acenset · React, TypeScript
+GitHub: github.com/pranay-reddy2/Acenset
+A production-ready exam prep platform with a fully type-safe UI built in TypeScript and React. Focused on clean architecture and scalable component design.
+
+Google Calendar Clone · MERN Stack, PostgreSQL
+GitHub: github.com/pranay-reddy2/google-calender
+A full-stack calendar app with event creation, reminders, and recurring schedule support using PostgreSQL for relational data. Forked by other developers.
+
+INTERESTS
+LLM / Agentic AI Systems · Full-Stack Development · Low-Level Design · Open Source · Scalable Product Engineering

@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+pinecone
+requests
+python-dotenv
+pydantic
