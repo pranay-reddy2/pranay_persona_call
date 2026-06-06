@@ -81,7 +81,7 @@ class VapiRequest(BaseModel):
     messages: list
     stream: bool = False
 
-@app.post("/v1/chat/completions")
+@app.post("/chat/completions")
 async def vapi_chat(req: VapiRequest):
     try:
         # Extract last user message
