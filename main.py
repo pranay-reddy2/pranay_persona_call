@@ -9,6 +9,8 @@ from typing import Optional
 from dotenv import load_dotenv
 from fastapi.responses import Response
 from fastapi import Request
+import re
+from datetime import datetime, timedelta
 
 
 from retriever import retrieve
@@ -96,19 +98,104 @@ class VapiRequest(BaseModel):
     tool_choice: Optional[str] = None
 
 
-# =====================================================
-# CHAT ENDPOINT (WEB UI)
-# =====================================================
+CAL_API_KEY = os.getenv("CAL_API_KEY")
+CAL_USERNAME = os.getenv("CAL_USERNAME", "pranay-reddy-mqfpgr")
+
+BOOKING_KEYWORDS = ["book", "schedule", "meeting", "call", "interview", "appointment", "available", "availability"]
+
+def wants_to_book(message: str) -> bool:
+    return any(word in message.lower() for word in BOOKING_KEYWORDS)
+
+def get_cal_availability():
+    """Get available slots from Cal.com for next 7 days"""
+    try:
+        today = datetime.utcnow()
+        end = today + timedelta(days=7)
+        
+        response = requests.get(
+            "https://api.cal.com/v1/availability",
+            params={
+                "apiKey": CAL_API_KEY,
+                "username": CAL_USERNAME,
+                "dateFrom": today.strftime("%Y-%m-%d"),
+                "dateTo": end.strftime("%Y-%m-%d"),
+                "eventTypeId": 1
+            },
+            timeout=10
+        )
+        data = response.json()
+        print("CAL AVAILABILITY:", data)
+        return data
+    except Exception as e:
+        print("CAL AVAILABILITY ERROR:", str(e))
+        return None
+
+def create_cal_booking(name: str, email: str, start_time: str, notes: str = ""):
+    """Create a booking on Cal.com"""
+    try:
+        response = requests.post(
+            "https://api.cal.com/v1/bookings",
+            params={"apiKey": CAL_API_KEY},
+            json={
+                "eventTypeId": 1,
+                "start": start_time,
+                "responses": {
+                    "name": name,
+                    "email": email,
+                    "notes": notes
+                },
+                "timeZone": "Asia/Kolkata",
+                "language": "en",
+                "metadata": {}
+            },
+            timeout=10
+        )
+        data = response.json()
+        print("CAL BOOKING:", data)
+        return data
+    except Exception as e:
+        print("CAL BOOKING ERROR:", str(e))
+        return None
+
 
 @app.post("/chat")
 async def chat(req: ChatRequest):
     try:
         context = retrieve(req.message)
 
+        # Build booking context if needed
+        booking_context = ""
+        if wants_to_book(req.message):
+            availability = get_cal_availability()
+            if availability and "busy" in availability:
+                booking_context = f"\n\nCALENDAR: Booking link is https://cal.com/{CAL_USERNAME}. For direct booking, ask the user for their name, email, and preferred time slot."
+            else:
+                booking_context = f"\n\nCALENDAR: Booking link is https://cal.com/{CAL_USERNAME}. Ask the user for their name, email, and preferred time."
+
+        tools = [
+            {
+                "type": "function",
+                "function": {
+                    "name": "create_booking",
+                    "description": "Book a meeting with Pranay on his calendar. Call this when you have the user's name, email, and preferred time.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "name": {"type": "string", "description": "Full name of the person booking"},
+                            "email": {"type": "string", "description": "Email of the person booking"},
+                            "start_time": {"type": "string", "description": "ISO 8601 datetime e.g. 2026-06-10T14:00:00"},
+                            "notes": {"type": "string", "description": "Optional notes"}
+                        },
+                        "required": ["name", "email", "start_time"]
+                    }
+                }
+            }
+        ]
+
         messages = [
             {
                 "role": "system",
-                "content": SYSTEM_PROMPT.format(context=context)
+                "content": SYSTEM_PROMPT.format(context=context + booking_context)
             }
         ]
 
@@ -128,8 +215,9 @@ async def chat(req: ChatRequest):
             json={
                 "model": MODEL,
                 "messages": messages,
+                "tools": tools,
                 "temperature": 0.3,
-                "max_tokens": 250
+                "max_tokens": 300
             },
             timeout=60
         )
@@ -140,13 +228,37 @@ async def chat(req: ChatRequest):
         if "choices" not in data:
             return {"reply": f"API Error: {data}"}
 
-        reply = data["choices"][0]["message"]["content"]
+        choice = data["choices"][0]
+        finish_reason = choice.get("finish_reason")
+        message_obj = choice.get("message", {})
+
+        # LLM wants to call create_booking
+        if finish_reason == "tool_calls" and message_obj.get("tool_calls"):
+            tool_call = message_obj["tool_calls"][0]
+            args = json.loads(tool_call["function"]["arguments"])
+
+            print("BOOKING ARGS:", args)
+
+            booking = create_cal_booking(
+                name=args.get("name", "Guest"),
+                email=args.get("email", ""),
+                start_time=args.get("start_time", ""),
+                notes=args.get("notes", "")
+            )
+
+            if booking and booking.get("id"):
+                reply = f"Done! Your meeting with Pranay is confirmed for {args.get('start_time', 'the requested time')} IST. A calendar invite has been sent to {args.get('email')}."
+            else:
+                reply = f"I had trouble booking that slot automatically. You can book directly at https://cal.com/{CAL_USERNAME}"
+
+            return {"reply": reply}
+
+        reply = message_obj.get("content", "")
         return {"reply": reply}
 
     except Exception as e:
         print("CHAT ERROR:", str(e))
-        return {"reply": "Something went wrong."}
-
+        return {"reply": "Something went wrong. Please try again."}
 
 # =====================================================
 # VAPI ENDPOINT — SSE Streaming + Tool Forwarding
