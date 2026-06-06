@@ -23,7 +23,7 @@ CAL_USERNAME = os.getenv("CAL_USERNAME", "pranay-reddy-mqfpgr")
 
 MODEL = "meta-llama/llama-3.3-70b-instruct"
 
-SYSTEM_PROMPT = SYSTEM_PROMPT = """
+SYSTEM_PROMPT = """
 You are Pranay Reddy's AI representative.
 
 RULES:
