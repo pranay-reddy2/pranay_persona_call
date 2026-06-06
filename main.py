@@ -3,7 +3,7 @@ import json
 import requests
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import Optional
 from dotenv import load_dotenv
@@ -69,8 +69,8 @@ class VapiRequest(BaseModel):
     model: str = ""
     temperature: float = 0.3
     max_tokens: int = 200
-    tools: Optional[list] = None          # ✅ Accept tools from VAPI
-    tool_choice: Optional[str] = None     # ✅ Accept tool_choice from VAPI
+    tools: Optional[list] = None
+    tool_choice: Optional[str] = None
 
 
 # =====================================================
@@ -186,14 +186,20 @@ async def vapi_chat(req: VapiRequest):
         messages.append({"role": "user", "content": user_message})
 
         # ── Build OpenRouter payload ──
+        # Force DeepInfra first — it reliably returns tool_calls
+        # (WandB was dropping the tool_calls data)
         openrouter_payload = {
             "model": MODEL,
             "messages": messages,
             "temperature": 0.3,
-            "max_tokens": 200
+            "max_tokens": 200,
+            "provider": {
+                "order": ["DeepInfra", "Together", "Fireworks"],
+                "allow_fallbacks": True
+            }
         }
 
-        # ✅ Forward tools from VAPI to OpenRouter if present
+        # ── Forward tools from VAPI to OpenRouter if present ──
         if req.tools:
             openrouter_payload["tools"] = req.tools
             print(f"TOOLS FORWARDED: {len(req.tools)} tool(s)")
@@ -230,8 +236,11 @@ async def vapi_chat(req: VapiRequest):
                 yield f"data: {payload}\n\n"
                 yield "data: [DONE]\n\n"
 
-            return StreamingResponse(error_stream(), media_type="text/event-stream",
-                                     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+            return StreamingResponse(
+                error_stream(),
+                media_type="text/event-stream",
+                headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
+            )
 
         choice = data["choices"][0]
         finish_reason = choice.get("finish_reason", "stop")
@@ -242,7 +251,7 @@ async def vapi_chat(req: VapiRequest):
         # ── Stream back to VAPI ──
         async def stream_generator():
 
-            # ✅ If LLM wants to call a tool — forward tool_calls to VAPI
+            # ── Tool call response ──
             if finish_reason == "tool_calls" and message.get("tool_calls"):
                 print("TOOL CALLS DETECTED:", message["tool_calls"])
 
@@ -285,8 +294,30 @@ async def vapi_chat(req: VapiRequest):
                 })
                 yield f"data: {stop_payload}\n\n"
 
+            # ── Provider returned tool_calls finish but dropped the data ──
+            elif finish_reason == "tool_calls" and not message.get("tool_calls"):
+                print("WARNING: tool_calls finish_reason but no tool_calls in message — provider dropped data!")
+                fallback = "I'd like to book that for you — could you say that again so I can try once more?"
+                payload = json.dumps({
+                    "id": data.get("id", "chatcmpl-1"),
+                    "object": "chat.completion.chunk",
+                    "created": data.get("created", 0),
+                    "model": MODEL,
+                    "choices": [{
+                        "delta": {"role": "assistant", "content": fallback},
+                        "index": 0,
+                        "finish_reason": "stop"
+                    }]
+                })
+                yield f"data: {payload}\n\n"
+
+                stop_payload = json.dumps({
+                    "choices": [{"delta": {}, "index": 0, "finish_reason": "stop"}]
+                })
+                yield f"data: {stop_payload}\n\n"
+
+            # ── Normal text response ──
             else:
-                # ── Normal text response ──
                 content = message.get("content", "")
                 print("\nFINAL RESPONSE TO VAPI:", content)
 
