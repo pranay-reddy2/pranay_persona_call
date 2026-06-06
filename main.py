@@ -87,7 +87,17 @@ class VapiRequest(BaseModel):
 # =====================================================
 # CAL.COM HELPERS
 # =====================================================
+from datetime import datetime, timedelta
 
+def ist_to_utc(ist_string: str) -> str:
+    """Convert IST datetime string to UTC ISO 8601"""
+    try:
+        dt = datetime.fromisoformat(ist_string.replace("Z", ""))
+        utc_dt = dt - timedelta(hours=5, minutes=30)
+        return utc_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+    except:
+        return ist_string
+    
 def wants_to_book(message: str) -> bool:
     return any(word in message.lower() for word in BOOKING_KEYWORDS)
 
@@ -129,7 +139,7 @@ def create_cal_booking(name: str, email: str, start_time: str, notes: str = ""):
                 "Content-Type": "application/json"
             },
             json={
-                "start": start_time,
+                "start": ist_to_utc(start_time),
                 "eventTypeSlug": "secret",
                 "username": CAL_USERNAME,
                 "attendee": {
