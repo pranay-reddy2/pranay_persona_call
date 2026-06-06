@@ -1,8 +1,9 @@
 import os
+import json
 import requests
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
@@ -63,6 +64,9 @@ class ChatRequest(BaseModel):
 class VapiRequest(BaseModel):
     messages: list
     stream: bool = False
+    model: str = ""
+    temperature: float = 0.3
+    max_tokens: int = 200
 
 
 # =====================================================
@@ -133,7 +137,7 @@ async def chat(req: ChatRequest):
 
 
 # =====================================================
-# VAPI ENDPOINT
+# VAPI ENDPOINT — SSE Streaming
 # =====================================================
 
 @app.post("/chat/completions")
@@ -145,6 +149,7 @@ async def vapi_chat(req: VapiRequest):
         print(req.model_dump())
         print("============================\n")
 
+        # ── Extract latest user message ──
         user_message = "Hello"
 
         for msg in reversed(req.messages):
@@ -168,20 +173,21 @@ async def vapi_chat(req: VapiRequest):
 
         print("USER MESSAGE:", user_message)
 
+        # ── Build history (exclude last user message) ──
         history = [
             m
             for m in req.messages
             if m.get("role") in ["user", "assistant"]
         ][:-1]
 
+        # ── RAG retrieval ──
         context = retrieve(user_message)
 
+        # ── Build messages for OpenRouter ──
         messages = [
             {
                 "role": "system",
-                "content": SYSTEM_PROMPT.format(
-                    context=context
-                )
+                "content": SYSTEM_PROMPT.format(context=context)
             }
         ]
 
@@ -194,6 +200,7 @@ async def vapi_chat(req: VapiRequest):
             }
         )
 
+        # ── Call OpenRouter (non-streaming) ──
         response = requests.post(
             "https://openrouter.ai/api/v1/chat/completions",
             headers={
@@ -219,12 +226,27 @@ async def vapi_chat(req: VapiRequest):
         print(data)
 
         if "choices" not in data:
+            # Stream back error in SSE format
+            async def error_stream():
+                payload = json.dumps({
+                    "choices": [{
+                        "delta": {
+                            "role": "assistant",
+                            "content": "I'm having trouble right now. Please try again."
+                        },
+                        "index": 0,
+                        "finish_reason": "stop"
+                    }]
+                })
+                yield f"data: {payload}\n\n"
+                yield "data: [DONE]\n\n"
 
-            return JSONResponse(
-                status_code=500,
-                content={
-                    "error": "No choices returned",
-                    "response": data
+            return StreamingResponse(
+                error_stream(),
+                media_type="text/event-stream",
+                headers={
+                    "Cache-Control": "no-cache",
+                    "X-Accel-Buffering": "no",
                 }
             )
 
@@ -234,23 +256,48 @@ async def vapi_chat(req: VapiRequest):
         print(content)
         print()
 
-        return JSONResponse(
-            content={
+        # ── Stream back to VAPI in SSE format ──
+        async def stream_generator():
+            # Main content chunk
+            payload = json.dumps({
                 "id": data.get("id", "chatcmpl-1"),
-                "object": "chat.completion",
+                "object": "chat.completion.chunk",
                 "created": data.get("created", 0),
                 "model": MODEL,
-                "choices": [
-                    {
-                        "index": 0,
-                        "message": {
-                            "role": "assistant",
-                            "content": content
-                        },
-                        "finish_reason": "stop"
-                    }
-                ],
-                "usage": data.get("usage", {})
+                "choices": [{
+                    "delta": {
+                        "role": "assistant",
+                        "content": content
+                    },
+                    "index": 0,
+                    "finish_reason": None
+                }]
+            })
+            yield f"data: {payload}\n\n"
+
+            # Stop chunk
+            stop_payload = json.dumps({
+                "id": data.get("id", "chatcmpl-1"),
+                "object": "chat.completion.chunk",
+                "created": data.get("created", 0),
+                "model": MODEL,
+                "choices": [{
+                    "delta": {},
+                    "index": 0,
+                    "finish_reason": "stop"
+                }]
+            })
+            yield f"data: {stop_payload}\n\n"
+
+            # SSE done signal
+            yield "data: [DONE]\n\n"
+
+        return StreamingResponse(
+            stream_generator(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "X-Accel-Buffering": "no",
             }
         )
 
@@ -258,22 +305,30 @@ async def vapi_chat(req: VapiRequest):
 
         print("VAPI ERROR:", str(e))
 
-        return JSONResponse(
-            content={
+        async def exception_stream():
+            payload = json.dumps({
                 "id": "chatcmpl-error",
-                "object": "chat.completion",
+                "object": "chat.completion.chunk",
                 "created": 0,
                 "model": MODEL,
-                "choices": [
-                    {
-                        "index": 0,
-                        "message": {
-                            "role": "assistant",
-                            "content": "I'm having trouble right now. Please try again."
-                        },
-                        "finish_reason": "stop"
-                    }
-                ]
+                "choices": [{
+                    "delta": {
+                        "role": "assistant",
+                        "content": "I'm having trouble right now. Please try again."
+                    },
+                    "index": 0,
+                    "finish_reason": "stop"
+                }]
+            })
+            yield f"data: {payload}\n\n"
+            yield "data: [DONE]\n\n"
+
+        return StreamingResponse(
+            exception_stream(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "X-Accel-Buffering": "no",
             }
         )
 
