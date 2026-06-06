@@ -1,60 +1,99 @@
-Pranay Reddy N — AI Engineer Persona Facts
+Pranay Reddy N
+Bengaluru, India | pranayreddy672@gmail.com
+GitHub: github.com/pranay-reddy2
+LinkedIn: linkedin.com/in/pranay-reddy-n-783823326
 
-Why Pranay is a strong fit for Scaler AI Engineer role:
-- He is a Scaler student himself, so he understands the product, the learner journey, and the platform from the inside. He is not an outsider guessing at user needs.
-- He is already building production LLM tools as a 2nd-year student. NoteBookLLM is a real RAG pipeline he built and actively maintains — updated within the last 24 hours.
-- CLI-Agent demonstrates he understands agentic AI patterns — tool use, autonomous execution, prompt engineering — not just wrappers around APIs.
-- He has full-stack capability: React frontend, Node/Express/FastAPI backend, PostgreSQL/MongoDB databases. He can own a feature end to end.
-- He has hands-on experience with the exact stack Scaler would use: LLM APIs, RAG pipelines, vector databases, REST APIs.
-- He is comfortable with ambiguity and learns fast — he built this entire AI persona agent as part of the screening itself.
-
-Personality and working style:
-- Pranay is hands-on and iterative. He prefers to build first and refine, not plan forever.
-- He is interested in the business side of products, not just the engineering.
-- He is open source friendly — his repos have been forked by other developers.
-
-Contact and links:
-- Email: pranayreddy672@gmail.com
-- GitHub: github.com/pranay-reddy2
-- LinkedIn: linkedin.com/in/pranay-reddy-n-783823326
-- Location: Bengaluru, India
-
-
-Bengaluru, India  |  pranayreddy672@gmail.com  |  LinkedIn  |  GitHub
 Full-Stack & AI Engineer · Building production LLM tools as a 2nd-year CS student
+
 EDUCATION
-Scaler School of Technology / BITS Pilani (Online Degree)  ·  2024 – 2028
+Scaler School of Technology / BITS Pilani (Online Degree) · 2024 – 2028
 Bachelor of Science in Computer Science
+Note: Scaler School of Technology is the college. Scaler AI Labs is the AI engineering arm of Scaler Academy — a separate team but part of the same parent company.
+
 TECHNICAL SKILLS
 Languages: Java, JavaScript, TypeScript, Python, SQL
 Frontend: React, Next.js, React Native, HTML, CSS
 Backend: Node.js, Express.js, Spring Boot, REST APIs, WebSockets
 Databases: MongoDB, PostgreSQL, MySQL
-AI / ML: LLM integration, RAG pipelines, Supervised Learning fundamentals
+AI/ML: LLM integration, RAG pipelines, Supervised Learning fundamentals
 Tools: Git, GitHub, Postman, Vercel, Railway
+
 DATA STRUCTURES & ALGORITHMS
-•	Strong command over Arrays, Strings, Linked Lists, Stacks, Queues, Trees, Heaps, Tries, HashMaps, and Sets.
-•	Solved 100+ interview-style problems covering Binary Search, Two Pointers, Sliding Window, and Greedy Algorithms.
-•	Hands-on experience with Backtracking, Dynamic Programming (memoization & tabulation), and Bit Manipulation.
-•	Practiced Low-Level Design (LLD): Parking Lot, Snake & Ladder, Pen — applied OOP, SOLID principles, and design patterns.
+Strong command over Arrays, Strings, Linked Lists, Stacks, Queues, Trees, Heaps, Tries, HashMaps, and Sets.
+Solved 100+ interview-style problems covering Binary Search, Two Pointers, Sliding Window, and Greedy Algorithms.
+Hands-on experience with Backtracking, Dynamic Programming (memoization and tabulation), and Bit Manipulation.
+Practiced Low-Level Design (LLD): Parking Lot, Snake & Ladder, Pen — applied OOP, SOLID principles, and design patterns in Java.
 
 PROJECTS
-NoteBookLLM  ·  Python, JavaScript, LLM APIs  ·  github.com/pranay-reddy2/NoteBookLLM
-•	Built a full-stack AI note-taking tool that uses RAG (Retrieval-Augmented Generation) to let users query their own documents with natural language.
-•	Engineered a Python backend with LLM API integration and a JavaScript frontend, enabling context-aware answers from uploaded content.
-•	Actively maintained — updated within the last 24 hours, with ongoing feature development.
-CLI-Agent  ·  JavaScript, LLM APIs  ·  github.com/pranay-reddy2/CLI-Agent
-•	Developed an LLM-powered terminal agent that interprets natural language commands and executes shell tasks autonomously.
-•	Demonstrates practical understanding of agentic AI patterns, tool-use, and prompt engineering.
-Acenset – Exam Preparation Platform  ·  React, TypeScript  ·  github.com/pranay-reddy2/Acenset
-•	Designed and deployed a production-ready exam prep platform with a fully type-safe UI built in TypeScript and React.
-•	Focused on clean architecture and scalable component design, enabling seamless content navigation and quiz workflows.
-Collabify – Real-Time Collaborative Editor  ·  MERN Stack, WebSockets  ·  github.com/pranay-reddy2/collabify
-•	Built a Google Docs-style collaborative editor supporting concurrent multi-user editing using WebSockets for real-time sync.
-•	Handled conflict resolution for simultaneous edits; repo has been forked by other developers.
-Google Calendar Clone  ·  MERN Stack, PostgreSQL  ·  github.com/pranay-reddy2/google-calender
-•	Developed a full-stack calendar app with event creation, reminders, and recurring schedule support using PostgreSQL for relational data.
-•	Forked by other developers; demonstrates production-quality backend design.
+
+NoteBookLLM · Python, JavaScript, LLM APIs
+GitHub: github.com/pranay-reddy2/NoteBookLLM
+Backend GitHub: github.com/pranay-reddy2/NoteBookLLM_Backend
+NoteBookLLM is Pranay's flagship AI project. It is a full-stack RAG-powered note-taking tool that lets users upload documents and query them with natural language instead of manually searching.
+Tech stack: Python backend, JavaScript frontend, LLM APIs, vector database for embeddings.
+Purpose: Enable context-aware question answering over personal documents using Retrieval-Augmented Generation.
+Design tradeoffs: Chose RAG over fine-tuning because RAG works with any document without retraining the model. Kept frontend and backend in separate repos for clean separation of concerns.
+What Pranay would do differently: Add user authentication and multi-user support from day one instead of building it as a single-user tool first. Would also implement chunk reranking to improve retrieval quality.
+Actively maintained — updated within the last month with ongoing feature development.
+
+CLI-Agent · JavaScript, LLM APIs
+GitHub: github.com/pranay-reddy2/CLI-Agent
+CLI-Agent is an LLM-powered terminal agent that interprets natural language commands and executes shell tasks autonomously.
+Tech stack: JavaScript, LLM APIs, Node.js.
+Purpose: Demonstrate agentic AI patterns — tool use, autonomous execution, prompt engineering.
+Design tradeoffs: Prioritized simplicity over safety guardrails in the first version. The agent can execute any shell command which is powerful but risky in production.
+What Pranay would do differently: Add safety guardrails and command whitelisting before any production use. Would add a confirmation step before destructive commands.
+
+GYM_CRM · React, Node.js, Express.js, PostgreSQL
+GitHub: github.com/pranay-reddy2/GYM_CRM
+GYM_CRM is a production-level full-stack gym management CRM built with commercial intent.
+Tech stack: React, Vite, Tailwind CSS, TanStack Query on frontend; Node.js, Express.js on backend; PostgreSQL (Neon) for database; Vercel for frontend deployment.
+Purpose: A one-time purchase alternative to subscription-based gym software targeting small gym owners.
+Features: Member management, check-ins, payments, trainer assignments, Kanban lead pipeline, churn risk alerts, AI-powered message composer.
+Design tradeoffs: Chose PostgreSQL over MongoDB for relational integrity between members, payments, and check-ins. Used name-based joins in checkins table which is technical debt.
+What Pranay would do differently: Replace name-based joins with proper foreign keys from day one. Add proper auth instead of relying on deployment-level security.
+
+Trading_Bot · Python
+GitHub: github.com/pranay-reddy2/Trading_Bot
+An automated trading bot in Python that applies algorithmic decision-making to financial markets.
+Tech stack: Python.
+Purpose: Demonstrates ability to apply programming to real financial systems and interest in algorithmic decision-making.
+
+LensPDF · TypeScript
+GitHub: github.com/pranay-reddy2/LensPDF
+A TypeScript-based PDF processing project.
+Purpose: Demonstrates range across different languages and problem domains beyond web development.
+Tech stack: TypeScript.
+
+vocallabs · JavaScript
+GitHub: github.com/pranay-reddy2/vocallabs
+An open-source JavaScript project with MIT license.
+Purpose: Demonstrates willingness to share work publicly and contribute to the open-source ecosystem.
+
+Collabify · MERN Stack, WebSockets
+GitHub: github.com/pranay-reddy2/collabify
+Collabify is a Google Docs-style real-time collaborative editor.
+Tech stack: MongoDB, Express.js, React, Node.js (MERN), WebSockets.
+Purpose: Support concurrent multi-user document editing with real-time sync.
+Design tradeoffs: Used basic WebSocket conflict resolution instead of a full CRDT implementation — simpler to build but less robust under heavy concurrent edits.
+What Pranay would do differently: Replace basic conflict resolution with a proper CRDT implementation like Yjs for true operational transformation.
+Forked by other developers.
+
+Acenset · React, TypeScript
+GitHub: github.com/pranay-reddy2/Acenset
+A production-ready exam prep platform.
+Tech stack: React, TypeScript.
+Purpose: Enable seamless content navigation and quiz workflows with a fully type-safe UI.
+Design tradeoffs: Prioritized type safety with TypeScript over faster iteration speed.
+What Pranay would do differently: Add a backend with user progress tracking instead of keeping it purely frontend.
+
+Google Calendar Clone · MERN Stack, PostgreSQL
+GitHub: github.com/pranay-reddy2/google-calender
+A full-stack calendar app with event creation, reminders, and recurring schedule support.
+Tech stack: MongoDB, Express.js, React, Node.js, PostgreSQL.
+Purpose: Demonstrate production-quality backend design with relational data.
+Design tradeoffs: Used PostgreSQL for calendar data because recurring events and reminders have relational structure that fits SQL better than NoSQL.
+Forked by other developers.
 
 INTERESTS
-LLM / Agentic AI Systems  ·  Full-Stack Development  ·  Low-Level Design  ·  Open Source  ·  Scalable Product Engineering
+LLM / Agentic AI Systems · Full-Stack Development · Low-Level Design · Open Source · Scalable Product Engineering
