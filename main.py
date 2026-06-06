@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from retriever import retrieve
 from dotenv import load_dotenv
+from fastapi import Request
 
 load_dotenv()
 
@@ -128,3 +129,10 @@ async def vapi_chat(req: VapiRequest):
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+@app.api_route("/{path:path}", methods=["POST", "GET"])
+async def catch_all(path: str, request: Request):
+    body = await request.body()
+    print(f"VAPI HIT: /{path}")
+    print(f"BODY: {body[:200]}")
+    return {"error": "wrong path", "path_hit": path}
