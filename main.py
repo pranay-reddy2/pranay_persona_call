@@ -17,11 +17,97 @@ load_dotenv()
 # CONFIG
 # =====================================================
 
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 CAL_API_KEY = os.getenv("CAL_API_KEY")
 CAL_USERNAME = os.getenv("CAL_USERNAME", "pranay-reddy-mqfpgr")
 
-MODEL = "meta-llama/llama-3.3-70b-instruct"
+# ── LLM provider chain ────────────────────────────────────────────────────────
+# Free providers first. Both speak the OpenAI chat-completions format, including
+# tool calls, so the rest of this file doesn't care which one answered.
+#   groq        GROQ_API_KEY        (free tier)      default model llama-3.3-70b-versatile
+#   openrouter  OPENROUTER_API_KEY  (":free" models) default model minimax/minimax-m2.7:free (override with OPENROUTER_MODEL)
+# To go back to the old paid setup: LLM_PROVIDER=openrouter and
+# OPENROUTER_MODEL=meta-llama/llama-3.3-70b-instruct.
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "groq").strip().lower()
+LLM_FALLBACK_PROVIDERS = [p.strip().lower() for p in os.getenv("LLM_FALLBACK_PROVIDERS", "openrouter").split(",") if p.strip()]
+
+PROVIDERS = {
+    "groq": {
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "key_env": "GROQ_API_KEY",
+        "model": os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
+        "headers": {},
+    },
+    "openrouter": {
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "key_env": "OPENROUTER_API_KEY",
+        "model": os.getenv("OPENROUTER_MODEL", "minimax/minimax-m2.7:free"),
+        "headers": {"HTTP-Referer": "https://pranay-persona-call.onrender.com", "X-Title": "Pranay AI Agent"},
+    },
+}
+
+
+def provider_chain():
+    order = []
+    for name in [LLM_PROVIDER, *LLM_FALLBACK_PROVIDERS]:
+        if name in PROVIDERS and name not in order and os.getenv(PROVIDERS[name]["key_env"]):
+            order.append(name)
+    return order
+
+
+MODEL = PROVIDERS.get(LLM_PROVIDER, PROVIDERS["groq"])["model"]   # label used in SSE chunks
+
+
+def llm_chat(messages, tools=None, tool_choice=None, temperature=0.3, max_tokens=300):
+    """
+    One chat completion over the provider chain. Returns the OpenAI-style
+    response dict of the first provider that gives a usable answer, or
+    {"error": "..."} if all fail. Never raises.
+    """
+    chain = provider_chain()
+    if not chain:
+        return {"error": "No LLM API key configured (set GROQ_API_KEY or OPENROUTER_API_KEY)."}
+
+    errors = []
+    for name in chain:
+        p = PROVIDERS[name]
+        payload = {"model": p["model"], "messages": messages, "temperature": temperature, "max_tokens": max_tokens}
+        if tools:
+            payload["tools"] = tools
+        if tool_choice:
+            payload["tool_choice"] = tool_choice
+        try:
+            r = requests.post(
+                p["url"],
+                headers={"Authorization": f"Bearer {os.getenv(p['key_env'])}", "Content-Type": "application/json", **p["headers"]},
+                json=payload,
+                timeout=60,
+            )
+            data = r.json()
+            if r.status_code < 400 and data.get("choices"):
+                print(f"LLM: {name} ({p['model']}) ok")
+                return data
+            errors.append(f"{name}: HTTP {r.status_code} {str(data)[:160]}")
+        except Exception as e:  # network / JSON errors -> try next provider
+            errors.append(f"{name}: {e}")
+        print(f"LLM: {name} failed -> {errors[-1]}")
+    return {"error": " | ".join(errors)}
+
+
+# ── Daily request cap (in-memory) ─────────────────────────────────────────────
+DAILY_REQUEST_CAP = int(os.getenv("DAILY_REQUEST_CAP", "200"))
+CONTACT_EMAIL = os.getenv("CONTACT_EMAIL", "pranayreddy672@gmail.com")
+LIMIT_MESSAGE = f"Demo limit reached for today — email {CONTACT_EMAIL} and I'll reset it."
+_cap = {"day": None, "count": 0}
+
+
+def consume_daily_quota() -> bool:
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+    if _cap["day"] != today:
+        _cap["day"], _cap["count"] = today, 0
+    if _cap["count"] >= DAILY_REQUEST_CAP:
+        return False
+    _cap["count"] += 1
+    return True
 
 SYSTEM_PROMPT = """
 You are Pranay Reddy's AI representative.
@@ -191,6 +277,8 @@ CHAT_TOOLS = [
 
 @app.post("/chat")
 async def chat(req: ChatRequest):
+    if not consume_daily_quota():
+        return {"reply": LIMIT_MESSAGE, "limit_reached": True}
     try:
         context = retrieve(req.message)
 
@@ -210,29 +298,12 @@ async def chat(req: ChatRequest):
 
         messages.append({"role": "user", "content": req.message})
 
-        response = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": "https://pranay-persona-call.onrender.com",
-                "X-Title": "Pranay AI Agent"
-            },
-            json={
-                "model": MODEL,
-                "messages": messages,
-                "tools": CHAT_TOOLS,
-                "temperature": 0.3,
-                "max_tokens": 300
-            },
-            timeout=60
-        )
-
-        data = response.json()
+        data = llm_chat(messages, tools=CHAT_TOOLS, temperature=0.3, max_tokens=300)
         print("CHAT RESPONSE:", data)
 
         if "choices" not in data:
-            return {"reply": f"API Error: {data}"}
+            print("CHAT LLM ERROR:", data.get("error"))
+            return {"reply": "I'm having trouble reaching my language model right now. Please try again in a moment."}
 
         choice = data["choices"][0]
         finish_reason = choice.get("finish_reason")
@@ -300,7 +371,9 @@ async def vapi_chat(req: VapiRequest):
 
         print("USER MESSAGE:", user_message)
 
-        context = retrieve(user_message)
+        # Cap check first: retrieval itself spends embedding quota.
+        capped = not consume_daily_quota()
+        context = "" if capped else retrieve(user_message)
 
         allowed_roles = {"system", "user", "assistant", "tool"}
         history = [m for m in req.messages if m.get("role") in allowed_roles]
@@ -318,45 +391,23 @@ async def vapi_chat(req: VapiRequest):
 
         print(f"HISTORY LENGTH: {len(openai_messages)} messages")
 
-        openrouter_payload = {
-            "model": MODEL,
-            "messages": openai_messages,
-            "temperature": 0.2,
-            "max_tokens": 200,
-            "provider": {
-                "order": ["DeepInfra", "Together", "Fireworks"],
-                "allow_fallbacks": True
-            }
-        }
-
         if req.tools:
-            openrouter_payload["tools"] = req.tools
             print(f"TOOLS FORWARDED: {len(req.tools)} tool(s)")
 
-        if req.tool_choice:
-            openrouter_payload["tool_choice"] = req.tool_choice
-
-        response = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": "https://pranay-persona-call.onrender.com",
-                "X-Title": "Pranay AI Agent"
-            },
-            json=openrouter_payload,
-            timeout=60
-        )
-
-        print("OPENROUTER STATUS:", response.status_code)
-        data = response.json()
-        print("OPENROUTER RESPONSE:", data)
+        if capped:
+            data = {"error": "daily cap"}
+        else:
+            data = llm_chat(openai_messages, tools=req.tools or None, tool_choice=req.tool_choice,
+                            temperature=0.2, max_tokens=200)
+        print("LLM RESPONSE:", data)
 
         if "choices" not in data:
+            spoken = LIMIT_MESSAGE if data.get("error") == "daily cap" else "I'm having trouble right now. Please try again."
+
             async def error_stream():
                 payload = json.dumps({
                     "choices": [{
-                        "delta": {"role": "assistant", "content": "I'm having trouble right now. Please try again."},
+                        "delta": {"role": "assistant", "content": spoken},
                         "index": 0,
                         "finish_reason": "stop"
                     }]
@@ -482,7 +533,16 @@ async def root():
 
 @app.get("/health")
 async def health():
-    return {"status": "ok"}
+    """Liveness probe: touches no LLM, embeddings or Pinecone."""
+    return {"ok": True}
+
+
+@app.get("/stats")
+async def stats():
+    return {
+        "llm_providers": provider_chain(),
+        "quota": {"cap": DAILY_REQUEST_CAP, "used_today": _cap["count"] if _cap["day"] == datetime.utcnow().strftime("%Y-%m-%d") else 0},
+    }
 
 
 @app.options("/chat")
